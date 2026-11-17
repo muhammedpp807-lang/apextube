@@ -1,0 +1,2511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ApexTube - Playlist Downloader</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    /* ==========================================================================
+       1. ROOT VARIABLES & THEME SETUP
+       ========================================================================== */
+    :root {
+      --bg-dark-primary: #030906;
+      --bg-dark-secondary: #07160e;
+      --bg-glass: rgba(8, 28, 18, 0.72);
+      --bg-glass-card: rgba(10, 36, 23, 0.65);
+      --bg-glass-input: rgba(4, 16, 10, 0.82);
+      --bg-glass-hover: rgba(0, 255, 136, 0.12);
+
+      --neon-primary: #00ff88;
+      --neon-secondary: #00cc6a;
+      --neon-glow: rgba(0, 255, 136, 0.45);
+      --neon-subtle-glow: rgba(0, 255, 136, 0.15);
+      --border-glass: 1px solid rgba(0, 255, 136, 0.28);
+      --border-glass-bright: 1px solid rgba(0, 255, 136, 0.65);
+      --border-glass-subtle: 1px solid rgba(0, 255, 136, 0.16);
+
+      --text-white: #ffffff;
+      --text-muted: #8fa89b;
+      --text-dim: #5c7568;
+      --text-dark: #03140a;
+
+      --danger-neon: #ff4757;
+      --warning-neon: #ffa502;
+      --info-neon: #2ed573;
+
+      --radius-sm: 8px;
+      --radius-md: 14px;
+      --radius-lg: 20px;
+      --radius-full: 9999px;
+
+      --shadow-glass: 0 12px 36px 0 rgba(0, 0, 0, 0.55), 0 0 20px rgba(0, 255, 136, 0.08);
+      --shadow-neon: 0 0 24px rgba(0, 255, 136, 0.4);
+      --shadow-neon-sm: 0 0 12px rgba(0, 255, 136, 0.35);
+
+      --transition-fast: 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+      --transition-normal: 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    /* ==========================================================================
+       2. RESET & GLOBAL LAYOUT
+       ========================================================================== */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    body {
+      background-color: var(--bg-dark-primary);
+      background-image:
+        radial-gradient(circle at 10% 20%, rgba(0, 255, 136, 0.04) 0%, transparent 40%),
+        radial-gradient(circle at 90% 80%, rgba(0, 204, 106, 0.05) 0%, transparent 45%);
+      color: var(--text-white);
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 12px;
+      position: relative;
+    }
+
+    /* Ambient Background Neon Glows */
+    .ambient-glow {
+      position: fixed;
+      pointer-events: none;
+      z-index: 0;
+      border-radius: 50%;
+      filter: blur(100px);
+      opacity: 0.65;
+      animation: pulseAmbient 10s ease-in-out infinite alternate;
+    }
+
+    .ambient-glow-bl {
+      bottom: -120px;
+      left: -100px;
+      width: 500px;
+      height: 500px;
+      background: radial-gradient(circle, rgba(0, 255, 136, 0.22) 0%, rgba(0, 204, 106, 0.08) 50%, transparent 75%);
+    }
+
+    .ambient-glow-br {
+      bottom: -140px;
+      right: -80px;
+      width: 550px;
+      height: 550px;
+      background: radial-gradient(circle, rgba(0, 204, 106, 0.25) 0%, rgba(0, 255, 136, 0.09) 50%, transparent 75%);
+    }
+
+    .ambient-glow-center {
+      top: 30%;
+      right: 25%;
+      width: 400px;
+      height: 400px;
+      background: radial-gradient(circle, rgba(0, 255, 136, 0.08) 0%, transparent 70%);
+      opacity: 0.4;
+    }
+
+    @keyframes pulseAmbient {
+      0% { transform: scale(1) translateY(0); opacity: 0.55; }
+      50% { transform: scale(1.08) translateY(-20px); opacity: 0.75; }
+      100% { transform: scale(0.95) translateY(15px); opacity: 0.5; }
+    }
+
+    /* ==========================================================================
+       3. DESKTOP WINDOW CONTAINER
+       ========================================================================== */
+    .app-window {
+      position: relative;
+      z-index: 10;
+      width: 100%;
+      max-width: 1240px;
+      height: 100%;
+      max-height: 840px;
+      background: var(--bg-glass);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: var(--border-glass);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-glass);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      transition: all var(--transition-normal);
+    }
+
+    .app-window::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      pointer-events: none;
+      box-shadow: inset 0 1px 1px 0 rgba(0, 255, 136, 0.4), inset 0 -1px 2px 0 rgba(0, 0, 0, 0.8);
+    }
+
+    /* Top Title Bar */
+    .window-titlebar {
+      height: 44px;
+      background: rgba(3, 12, 7, 0.88);
+      border-bottom: 1px solid rgba(0, 255, 136, 0.18);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      user-select: none;
+      flex-shrink: 0;
+    }
+
+    .titlebar-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      color: #e4fbf0;
+    }
+
+    .titlebar-brand .play-icon {
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 255, 136, 0.15);
+      border: 1px solid rgba(0, 255, 136, 0.4);
+      border-radius: 6px;
+      box-shadow: 0 0 10px rgba(0, 255, 136, 0.35);
+    }
+
+    .titlebar-brand .play-icon svg {
+      width: 11px;
+      height: 11px;
+      fill: var(--neon-primary);
+      filter: drop-shadow(0 0 4px var(--neon-primary));
+    }
+
+    .titlebar-brand .brand-name {
+      color: var(--neon-primary);
+      text-shadow: 0 0 8px rgba(0, 255, 136, 0.5);
+      font-weight: 800;
+    }
+
+    .titlebar-brand .brand-sep {
+      color: rgba(0, 255, 136, 0.3);
+      font-weight: 300;
+    }
+
+    .window-controls {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .win-btn {
+      width: 32px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all var(--transition-fast);
+    }
+
+    .win-btn:hover {
+      background: rgba(0, 255, 136, 0.15);
+      color: var(--neon-primary);
+    }
+
+    .win-btn.close:hover {
+      background: var(--danger-neon);
+      color: #fff;
+    }
+
+    /* Main Window Shell (Sidebar + Workspace) */
+    .window-body {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* ==========================================================================
+       4. LEFT SIDEBAR NAVIGATION
+       ========================================================================== */
+    .app-sidebar {
+      width: 220px;
+      background: rgba(5, 18, 12, 0.85);
+      border-right: 1px solid rgba(0, 255, 136, 0.16);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 20px 14px 16px 14px;
+      flex-shrink: 0;
+      z-index: 2;
+    }
+
+    .sidebar-nav {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .nav-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-dim);
+      padding: 0 12px 6px 12px;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 11px 14px;
+      border-radius: var(--radius-md);
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 13.5px;
+      font-weight: 600;
+      transition: all var(--transition-normal);
+      cursor: pointer;
+      border-left: 3px solid transparent;
+      position: relative;
+    }
+
+    .nav-item svg {
+      width: 18px;
+      height: 18px;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+      transition: all var(--transition-normal);
+      flex-shrink: 0;
+    }
+
+    .nav-item:hover {
+      color: #e6fff4;
+      background: rgba(0, 255, 136, 0.08);
+      border-left-color: rgba(0, 255, 136, 0.4);
+    }
+
+    /* Active State: Bright Glowing Green Pill & Left Accent */
+    .nav-item.active {
+      color: #ffffff;
+      background: linear-gradient(90deg, rgba(0, 255, 136, 0.22) 0%, rgba(0, 255, 136, 0.05) 100%);
+      border-left: 3px solid var(--neon-primary);
+      box-shadow: inset 0 0 15px rgba(0, 255, 136, 0.12), 0 0 16px rgba(0, 255, 136, 0.15);
+    }
+
+    .nav-item.active svg {
+      stroke: var(--neon-primary);
+      filter: drop-shadow(0 0 6px var(--neon-primary));
+    }
+
+    .nav-badge {
+      margin-left: auto;
+      background: var(--neon-primary);
+      color: var(--text-dark);
+      font-size: 10px;
+      font-weight: 800;
+      padding: 2px 7px;
+      border-radius: var(--radius-full);
+      box-shadow: 0 0 8px rgba(0, 255, 136, 0.5);
+    }
+
+    /* Bottom Promo Card */
+    .sidebar-promo-card {
+      position: relative;
+      background: linear-gradient(180deg, rgba(12, 42, 27, 0.8) 0%, rgba(6, 22, 14, 0.95) 100%);
+      border: 1px solid rgba(0, 255, 136, 0.26);
+      border-radius: var(--radius-md);
+      padding: 16px 14px 20px 14px;
+      text-align: center;
+      overflow: hidden;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    }
+
+    .sidebar-promo-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 10%;
+      right: 10%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--neon-primary), transparent);
+    }
+
+    .promo-crown-icon {
+      width: 38px;
+      height: 38px;
+      margin: 0 auto 10px auto;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(0, 255, 136, 0.24) 0%, rgba(0, 255, 136, 0.04) 70%);
+      border: 1px solid rgba(0, 255, 136, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 16px rgba(0, 255, 136, 0.35);
+    }
+
+    .promo-crown-icon svg {
+      width: 20px;
+      height: 20px;
+      fill: var(--neon-primary);
+      filter: drop-shadow(0 0 6px var(--neon-primary));
+    }
+
+    .promo-title {
+      font-size: 11.5px;
+      font-weight: 700;
+      line-height: 1.45;
+      color: #e5fbf0;
+      margin-bottom: 4px;
+      padding: 0 4px;
+    }
+
+    .promo-sub {
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+
+    /* Neon Wave Base in Promo Card */
+    .promo-wave {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 26px;
+      pointer-events: none;
+      opacity: 0.9;
+    }
+
+    /* ==========================================================================
+       5. MAIN WORKSPACE AREA & TABS
+       ========================================================================== */
+    .app-workspace {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      padding: 26px 36px 36px 36px;
+      position: relative;
+    }
+
+    .app-workspace::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .app-workspace::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .app-workspace::-webkit-scrollbar-thumb {
+      background: rgba(0, 255, 136, 0.25);
+      border-radius: 4px;
+    }
+
+    .tab-content {
+      display: none;
+      flex-direction: column;
+      width: 100%;
+      max-width: 960px;
+      margin: 0 auto;
+      animation: fadeInContent 0.3s ease-out;
+    }
+
+    .tab-content.active {
+      display: flex;
+    }
+
+    @keyframes fadeInContent {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ==========================================================================
+       6. HERO BANNER (Home Tab)
+       ========================================================================== */
+    .hero-banner {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      margin-bottom: 28px;
+      padding: 10px 0;
+    }
+
+    /* Glowing 3D Neon "A" Logo with Integrated Download Arrow */
+    .apex-logo-container {
+      position: relative;
+      width: 90px;
+      height: 90px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .apex-logo-glow {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle, rgba(0, 255, 136, 0.4) 0%, rgba(0, 204, 106, 0.1) 60%, transparent 80%);
+      filter: blur(14px);
+      border-radius: 50%;
+      animation: logoGlowPulse 4s ease-in-out infinite alternate;
+    }
+
+    @keyframes logoGlowPulse {
+      0% { transform: scale(0.92); opacity: 0.6; }
+      100% { transform: scale(1.1); opacity: 1; }
+    }
+
+    .apex-logo-svg {
+      position: relative;
+      z-index: 2;
+      width: 86px;
+      height: 86px;
+      filter: drop-shadow(0 0 12px rgba(0, 255, 136, 0.65)) drop-shadow(0 4px 18px rgba(0, 0, 0, 0.7));
+    }
+
+    .hero-text {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .hero-title {
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: var(--text-white);
+      line-height: 1.15;
+    }
+
+    .hero-title .neon-green {
+      color: var(--neon-primary);
+      text-shadow: 0 0 20px rgba(0, 255, 136, 0.7), 0 0 40px rgba(0, 255, 136, 0.3);
+    }
+
+    .hero-subtitle {
+      font-size: 14px;
+      color: var(--text-muted);
+      font-weight: 400;
+      line-height: 1.5;
+    }
+
+    /* ==========================================================================
+       7. URL INPUT BAR & CLIPBOARD
+       ========================================================================== */
+    .url-input-container {
+      position: relative;
+      width: 100%;
+      margin-bottom: 24px;
+    }
+
+    .url-input-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+      background: var(--bg-glass-input);
+      border: var(--border-glass);
+      border-radius: var(--radius-full);
+      padding: 6px 8px 6px 20px;
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(0, 255, 136, 0.15);
+      transition: all var(--transition-normal);
+    }
+
+    .url-input-wrapper:focus-within {
+      border: var(--border-glass-bright);
+      box-shadow: 0 0 24px rgba(0, 255, 136, 0.35), inset 0 0 15px rgba(0, 255, 136, 0.12);
+      background: rgba(5, 22, 14, 0.95);
+    }
+
+    .url-icon {
+      width: 22px;
+      height: 22px;
+      stroke: var(--neon-primary);
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+      filter: drop-shadow(0 0 6px var(--neon-primary));
+      margin-right: 14px;
+      flex-shrink: 0;
+    }
+
+    .url-input-field {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      font-family: inherit;
+      font-size: 14.5px;
+      color: var(--text-white);
+      font-weight: 500;
+      padding: 10px 0;
+    }
+
+    .url-input-field::placeholder {
+      color: var(--text-dim);
+      font-weight: 400;
+    }
+
+    .url-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-paste {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: rgba(0, 255, 136, 0.14);
+      border: 1px solid rgba(0, 255, 136, 0.35);
+      color: var(--neon-primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      box-shadow: 0 0 12px rgba(0, 255, 136, 0.15);
+      position: relative;
+    }
+
+    .btn-paste svg {
+      width: 20px;
+      height: 20px;
+      stroke: currentColor;
+      stroke-width: 2;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .btn-paste:hover {
+      background: var(--neon-primary);
+      color: var(--text-dark);
+      transform: scale(1.05);
+      box-shadow: 0 0 20px rgba(0, 255, 136, 0.6);
+    }
+
+    .btn-paste:active {
+      transform: scale(0.95);
+    }
+
+    /* Quick Link Metadata Preview Card */
+    .link-preview-box {
+      display: none;
+      margin-top: 12px;
+      background: rgba(6, 26, 17, 0.7);
+      border: 1px solid rgba(0, 255, 136, 0.22);
+      border-radius: var(--radius-md);
+      padding: 12px 16px;
+      align-items: center;
+      justify-content: space-between;
+      animation: fadeInContent 0.25s ease-out;
+    }
+
+    .link-preview-box.visible {
+      display: flex;
+    }
+
+    .link-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .link-type-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(0, 255, 136, 0.16);
+      border: 1px solid rgba(0, 255, 136, 0.4);
+      color: var(--neon-primary);
+      padding: 4px 10px;
+      border-radius: var(--radius-full);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .link-title-snippet {
+      font-size: 13px;
+      font-weight: 600;
+      color: #e5fbf1;
+      max-width: 480px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .link-clear-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-dim);
+      font-size: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      transition: color var(--transition-fast);
+    }
+
+    .link-clear-btn:hover {
+      color: var(--danger-neon);
+    }
+
+    /* ==========================================================================
+       8. 3-COLUMN SETTINGS ROW
+       ========================================================================== */
+    .settings-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+      margin-bottom: 30px;
+    }
+
+    .setting-card {
+      background: var(--bg-glass-card);
+      backdrop-filter: blur(14px);
+      border: var(--border-glass);
+      border-radius: var(--radius-md);
+      padding: 16px 18px;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+      transition: all var(--transition-normal);
+    }
+
+    .setting-card:hover {
+      border-color: rgba(0, 255, 136, 0.45);
+      transform: translateY(-2px);
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45), 0 0 16px rgba(0, 255, 136, 0.1);
+    }
+
+    .setting-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .setting-icon-pill {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: rgba(0, 255, 136, 0.14);
+      border: 1px solid rgba(0, 255, 136, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .setting-icon-pill svg {
+      width: 15px;
+      height: 15px;
+      stroke: var(--neon-primary);
+      stroke-width: 2;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      filter: drop-shadow(0 0 4px var(--neon-primary));
+    }
+
+    .setting-label {
+      font-size: 13px;
+      font-weight: 700;
+      color: #e6faf1;
+      letter-spacing: 0.2px;
+    }
+
+    /* Location Field & Browse Button */
+    .location-input-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .location-input {
+      flex: 1;
+      background: var(--bg-glass-input);
+      border: 1px solid rgba(0, 255, 136, 0.2);
+      border-radius: var(--radius-sm);
+      padding: 9px 12px;
+      font-size: 12px;
+      color: var(--text-muted);
+      font-family: 'JetBrains Mono', monospace;
+      outline: none;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      cursor: default;
+    }
+
+    .btn-browse {
+      background: rgba(0, 255, 136, 0.18);
+      border: 1px solid rgba(0, 255, 136, 0.45);
+      color: var(--neon-primary);
+      padding: 8px 14px;
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all var(--transition-fast);
+      box-shadow: 0 0 8px rgba(0, 255, 136, 0.15);
+      flex-shrink: 0;
+    }
+
+    .btn-browse:hover {
+      background: var(--neon-primary);
+      color: var(--text-dark);
+      box-shadow: 0 0 16px rgba(0, 255, 136, 0.5);
+    }
+
+    .btn-browse:active {
+      transform: scale(0.96);
+    }
+
+    /* Custom Styled Select Dropdowns */
+    .custom-select-wrapper {
+      position: relative;
+      width: 100%;
+    }
+
+    .custom-select {
+      width: 100%;
+      background: var(--bg-glass-input);
+      border: 1px solid rgba(0, 255, 136, 0.22);
+      border-radius: var(--radius-sm);
+      padding: 9px 34px 9px 14px;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-white);
+      outline: none;
+      cursor: pointer;
+      appearance: none;
+      -webkit-appearance: none;
+      transition: all var(--transition-fast);
+    }
+
+    .custom-select:focus {
+      border-color: var(--neon-primary);
+      box-shadow: 0 0 12px rgba(0, 255, 136, 0.3);
+    }
+
+    .custom-select option {
+      background: #081c12;
+      color: #ffffff;
+      padding: 10px;
+      font-size: 13px;
+    }
+
+    .select-chevron {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      pointer-events: none;
+      width: 16px;
+      height: 16px;
+      stroke: var(--neon-primary);
+      stroke-width: 2;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .setting-helper {
+      font-size: 10.5px;
+      color: var(--text-dim);
+      margin-top: 2px;
+    }
+
+    /* ==========================================================================
+       9. PRIMARY CTA BUTTON & LASER LINES
+       ========================================================================== */
+    .cta-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      margin-bottom: 28px;
+      position: relative;
+    }
+
+    .laser-line {
+      flex: 1;
+      height: 1.5px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .laser-line.left {
+      background: linear-gradient(90deg, transparent 0%, rgba(0, 255, 136, 0.7) 100%);
+      box-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+    }
+
+    .laser-line.right {
+      background: linear-gradient(90deg, rgba(0, 255, 136, 0.7) 0%, transparent 100%);
+      box-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+    }
+
+    .btn-download-primary {
+      background: linear-gradient(135deg, var(--neon-primary) 0%, var(--neon-secondary) 100%);
+      border: none;
+      border-radius: var(--radius-full);
+      padding: 15px 44px;
+      color: var(--text-dark);
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: 800;
+      letter-spacing: 0.4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 0 25px rgba(0, 255, 136, 0.45), 0 8px 24px rgba(0, 0, 0, 0.4);
+      transition: all var(--transition-normal);
+      position: relative;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .btn-download-primary::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+      transition: all 0.6s ease;
+    }
+
+    .btn-download-primary:hover {
+      transform: translateY(-2px) scale(1.02);
+      box-shadow: 0 0 35px rgba(0, 255, 136, 0.75), 0 12px 30px rgba(0, 0, 0, 0.5);
+    }
+
+    .btn-download-primary:hover::before {
+      left: 100%;
+    }
+
+    .btn-download-primary:active {
+      transform: translateY(1px) scale(0.98);
+    }
+
+    .btn-download-primary svg {
+      width: 20px;
+      height: 20px;
+      stroke: var(--text-dark);
+      stroke-width: 2.4;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .btn-download-primary:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      filter: grayscale(0.5);
+      transform: none !important;
+      box-shadow: none !important;
+    }
+
+    /* ==========================================================================
+       10. LIVE DOWNLOAD STATUS DRAWER (Progress Card)
+       ========================================================================== */
+    .download-drawer {
+      display: none;
+      background: var(--bg-glass-card);
+      border: var(--border-glass-bright);
+      border-radius: var(--radius-md);
+      padding: 20px 22px;
+      box-shadow: var(--shadow-glass), 0 0 24px rgba(0, 255, 136, 0.15);
+      position: relative;
+      overflow: hidden;
+      animation: slideDown 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .download-drawer.visible {
+      display: block;
+    }
+
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateY(-12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .drawer-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+
+    .drawer-title-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      overflow: hidden;
+    }
+
+    .status-pulse-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--neon-primary);
+      box-shadow: 0 0 10px var(--neon-primary);
+      animation: pulseDot 1.5s infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes pulseDot {
+      0% { transform: scale(0.85); opacity: 0.6; }
+      50% { transform: scale(1.25); opacity: 1; }
+      100% { transform: scale(0.85); opacity: 0.6; }
+    }
+
+    .active-download-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #ffffff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 520px;
+    }
+
+    .playlist-item-counter {
+      background: rgba(0, 255, 136, 0.15);
+      border: 1px solid rgba(0, 255, 136, 0.35);
+      color: var(--neon-primary);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: var(--radius-full);
+      white-space: nowrap;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Glowing Neon Progress Bar */
+    .progress-track-container {
+      margin-bottom: 14px;
+    }
+
+    .progress-track {
+      width: 100%;
+      height: 10px;
+      background: rgba(3, 16, 9, 0.95);
+      border: 1px solid rgba(0, 255, 136, 0.25);
+      border-radius: var(--radius-full);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--neon-secondary) 0%, var(--neon-primary) 100%);
+      border-radius: var(--radius-full);
+      box-shadow: 0 0 14px var(--neon-primary);
+      transition: width 0.25s ease-out;
+      position: relative;
+    }
+
+    .progress-bar-fill::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-image: linear-gradient(
+        -45deg,
+        rgba(255, 255, 255, 0.25) 25%,
+        transparent 25%,
+        transparent 50%,
+        rgba(255, 255, 255, 0.25) 50%,
+        rgba(255, 255, 255, 0.25) 75%,
+        transparent 75%,
+        transparent
+      );
+      background-size: 20px 20px;
+      animation: moveStripes 1s linear infinite;
+    }
+
+    @keyframes moveStripes {
+      0% { background-position: 0 0; }
+      100% { background-position: 20px 0; }
+    }
+
+    /* Real-Time Metrics Row */
+    .progress-metrics-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--text-muted);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .metric-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .metric-badge strong {
+      color: #e6fbf2;
+    }
+
+    .metric-percent {
+      font-size: 15px;
+      font-weight: 800;
+      color: var(--neon-primary);
+      text-shadow: 0 0 8px rgba(0, 255, 136, 0.5);
+    }
+
+    /* Drawer Actions */
+    .drawer-footer-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(0, 255, 136, 0.15);
+    }
+
+    .btn-secondary {
+      background: rgba(0, 255, 136, 0.12);
+      border: 1px solid rgba(0, 255, 136, 0.35);
+      color: var(--neon-primary);
+      padding: 7px 16px;
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all var(--transition-fast);
+    }
+
+    .btn-secondary:hover {
+      background: var(--neon-primary);
+      color: var(--text-dark);
+      box-shadow: 0 0 12px rgba(0, 255, 136, 0.4);
+    }
+
+    .btn-danger-outline {
+      background: rgba(255, 71, 87, 0.1);
+      border: 1px solid rgba(255, 71, 87, 0.4);
+      color: var(--danger-neon);
+      padding: 7px 16px;
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all var(--transition-fast);
+    }
+
+    .btn-danger-outline:hover {
+      background: var(--danger-neon);
+      color: #fff;
+    }
+
+    /* ==========================================================================
+       11. OTHER TABS (My Downloads, History, Settings)
+       ========================================================================== */
+    .tab-header-box {
+      margin-bottom: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .tab-title {
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--text-white);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .tab-title svg {
+      width: 24px;
+      height: 24px;
+      stroke: var(--neon-primary);
+      stroke-width: 2;
+      fill: none;
+      filter: drop-shadow(0 0 6px var(--neon-primary));
+    }
+
+    /* History List Table / Cards */
+    .history-container {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      background: rgba(6, 24, 15, 0.45);
+      border: 1px dashed rgba(0, 255, 136, 0.2);
+      border-radius: var(--radius-md);
+      color: var(--text-dim);
+    }
+
+    .empty-state svg {
+      width: 48px;
+      height: 48px;
+      stroke: var(--text-dim);
+      stroke-width: 1.5;
+      fill: none;
+      margin-bottom: 12px;
+    }
+
+    .history-card {
+      background: var(--bg-glass-card);
+      border: 1px solid rgba(0, 255, 136, 0.18);
+      border-radius: var(--radius-md);
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      transition: all var(--transition-fast);
+    }
+
+    .history-card:hover {
+      border-color: rgba(0, 255, 136, 0.45);
+      transform: translateX(4px);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+
+    .history-left {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      overflow: hidden;
+    }
+
+    .history-icon-badge {
+      width: 40px;
+      height: 40px;
+      border-radius: var(--radius-sm);
+      background: rgba(0, 255, 136, 0.14);
+      border: 1px solid rgba(0, 255, 136, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .history-icon-badge svg {
+      width: 20px;
+      height: 20px;
+      stroke: var(--neon-primary);
+      stroke-width: 2;
+      fill: none;
+    }
+
+    .history-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 3px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 500px;
+    }
+
+    .history-meta {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .history-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Settings Page Components */
+    .settings-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .settings-panel {
+      background: var(--bg-glass-card);
+      border: var(--border-glass);
+      border-radius: var(--radius-md);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .panel-section-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--neon-primary);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .sys-status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: var(--radius-full);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .sys-status-badge.ok {
+      background: rgba(0, 255, 136, 0.15);
+      border: 1px solid rgba(0, 255, 136, 0.4);
+      color: var(--neon-primary);
+    }
+
+    .sys-status-badge.warn {
+      background: rgba(255, 165, 2, 0.15);
+      border: 1px solid rgba(255, 165, 2, 0.4);
+      color: var(--warning-neon);
+    }
+
+    /* Toast Notification System */
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 1000;
+      pointer-events: none;
+    }
+
+    .toast {
+      background: rgba(4, 20, 12, 0.95);
+      border: 1px solid rgba(0, 255, 136, 0.5);
+      backdrop-filter: blur(12px);
+      border-radius: var(--radius-md);
+      padding: 12px 18px;
+      color: #ffffff;
+      font-size: 13px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6), 0 0 15px rgba(0, 255, 136, 0.3);
+      pointer-events: auto;
+      animation: toastIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      transition: all 0.3s ease;
+    }
+
+    @keyframes toastIn {
+      from { transform: translateX(50px); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+
+    .toast svg {
+      width: 18px;
+      height: 18px;
+      stroke: var(--neon-primary);
+      stroke-width: 2.2;
+      fill: none;
+      flex-shrink: 0;
+    }
+
+    .toast.toast-error {
+      border-color: var(--danger-neon);
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6), 0 0 15px rgba(255, 71, 87, 0.3);
+    }
+
+    .toast.toast-error svg {
+      stroke: var(--danger-neon);
+    }
+
+    /* Responsive tweaks */
+    @media (max-width: 900px) {
+      .settings-row {
+        grid-template-columns: 1fr;
+      }
+      .app-sidebar {
+        width: 190px;
+      }
+      .hero-title {
+        font-size: 26px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Ambient Glowing Background Elements -->
+  <div class="ambient-glow ambient-glow-bl"></div>
+  <div class="ambient-glow ambient-glow-br"></div>
+  <div class="ambient-glow ambient-glow-center"></div>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Desktop App Window Frame -->
+  <div class="app-window" id="appWindow">
+
+    <!-- Top Window Title Bar -->
+    <header class="window-titlebar">
+      <div class="titlebar-brand">
+        <div class="play-icon">
+          <svg viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg>
+        </div>
+        <span class="brand-name">ApexTube</span>
+        <span class="brand-sep">/</span>
+        <span class="brand-desc">Playlist Downloader</span>
+      </div>
+
+      <div class="window-controls">
+        <button class="win-btn minimize" id="winMinimizeBtn" title="Minimize">—</button>
+        <button class="win-btn maximize" id="winMaximizeBtn" title="Maximize / Restore">□</button>
+        <button class="win-btn close" id="winCloseBtn" title="Close">✕</button>
+      </div>
+    </header>
+
+    <!-- Main Window Shell -->
+    <div class="window-body">
+
+      <!-- Left Sidebar Navigation (220px Fixed) -->
+      <aside class="app-sidebar">
+        <div class="sidebar-top">
+          <div class="nav-label">Main Menu</div>
+          <nav class="sidebar-nav">
+            <!-- 1. Home Tab -->
+            <a class="nav-item active" data-tab="tab-home" id="navHome">
+              <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+              <span>Home</span>
+            </a>
+
+            <!-- 2. My Downloads Tab -->
+            <a class="nav-item" data-tab="tab-downloads" id="navDownloads">
+              <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              <span>My Downloads</span>
+              <span class="nav-badge" id="activeTasksBadge" style="display: none;">1</span>
+            </a>
+
+            <!-- 3. History Tab -->
+            <a class="nav-item" data-tab="tab-history" id="navHistory">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              <span>History</span>
+            </a>
+
+            <!-- 4. Settings Tab -->
+            <a class="nav-item" data-tab="tab-settings" id="navSettings">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+              <span>Settings</span>
+            </a>
+          </nav>
+        </div>
+
+        <!-- Bottom Promo Card with Crown & Neon Wave -->
+        <div class="sidebar-promo-card">
+          <div class="promo-crown-icon">
+            <svg viewBox="0 0 24 24"><path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14v2H5v-2z"></path></svg>
+          </div>
+          <div class="promo-title">Download Your Favourite Playlists Made Easy!</div>
+          <div class="promo-sub">Ultra Fast &bull; Best Audio/Video</div>
+
+          <!-- Base Wave SVG with neon emerald gradient -->
+          <svg class="promo-wave" viewBox="0 0 200 30" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="waveGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#00cc6a" stop-opacity="0.2"/>
+                <stop offset="50%" stop-color="#00ff88" stop-opacity="0.8"/>
+                <stop offset="100%" stop-color="#00cc6a" stop-opacity="0.2"/>
+              </linearGradient>
+            </defs>
+            <path d="M0,15 C40,25 70,5 100,18 C130,30 160,8 200,20 L200,30 L0,30 Z" fill="url(#waveGrad)"/>
+            <path d="M0,15 C40,25 70,5 100,18 C130,30 160,8 200,20" fill="none" stroke="#00ff88" stroke-width="1.5" opacity="0.9"/>
+          </svg>
+        </div>
+      </aside>
+
+      <!-- Main Workspace -->
+      <main class="app-workspace">
+
+        <!-- ==============================================================
+             TAB 1: HOME WORKSPACE
+             ============================================================== -->
+        <div class="tab-content active" id="tab-home">
+
+          <!-- Hero Banner with 3D Neon "A" Logo & Integrated Arrow -->
+          <section class="hero-banner">
+            <div class="apex-logo-container">
+              <div class="apex-logo-glow"></div>
+              <!-- Custom Stylized 3D Neon "A" Vector with Integrated Download Arrow -->
+              <svg class="apex-logo-svg" viewBox="0 0 100 100">
+                <defs>
+                  <linearGradient id="apexGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#55ffb2" />
+                    <stop offset="60%" stop-color="#00ff88" />
+                    <stop offset="100%" stop-color="#00b359" />
+                  </linearGradient>
+                  <linearGradient id="apexDark" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stop-color="rgba(0, 255, 136, 0.4)" />
+                    <stop offset="100%" stop-color="rgba(4, 24, 14, 0.95)" />
+                  </linearGradient>
+                  <filter id="neonShadow" x="-20%" y="-20%" width="140%" height="140%">
+                    <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#00ff88" flood-opacity="0.8" />
+                  </filter>
+                </defs>
+
+                <!-- Beveled Outer Apex "A" Body -->
+                <path d="M50 10 L84 80 L68 80 L50 44 L32 80 L16 80 Z"
+                      fill="url(#apexDark)"
+                      stroke="url(#apexGrad)"
+                      stroke-width="3"
+                      stroke-linejoin="round"
+                      filter="url(#neonShadow)" />
+
+                <!-- Stylized Horizontal Bevel Accent -->
+                <polygon points="36,66 64,66 58,74 42,74" fill="rgba(0, 255, 136, 0.3)" />
+
+                <!-- Integrated Neon Downward Download Arrow -->
+                <g filter="url(#neonShadow)">
+                  <line x1="50" y1="28" x2="50" y2="72" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" />
+                  <polyline points="40,62 50,74 60,62" fill="none" stroke="#00ff88" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" />
+                  <!-- Base Tray Glow Bar -->
+                  <line x1="28" y1="88" x2="72" y2="88" stroke="#00ff88" stroke-width="3.5" stroke-linecap="round" />
+                </g>
+              </svg>
+            </div>
+
+            <div class="hero-text">
+              <h1 class="hero-title">Paste <span class="neon-green">Playlist</span> Link</h1>
+              <p class="hero-subtitle">Select your preferred format, quality and location, then hit Download!</p>
+            </div>
+          </section>
+
+          <!-- URL Input Bar with Glowing Border & Clipboard Button -->
+          <div class="url-input-container">
+            <div class="url-input-wrapper">
+              <svg class="url-icon" viewBox="0 0 24 24">
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+              </svg>
+              <input type="text"
+                     id="playlistUrlInput"
+                     class="url-input-field"
+                     placeholder="Paste playlist URL here..."
+                     autocomplete="off"
+                     spellcheck="false">
+              <div class="url-actions">
+                <button class="btn-paste" id="pasteClipboardBtn" title="Paste from Clipboard">
+                  <svg viewBox="0 0 24 24">
+                    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                    <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Auto-detected Link Preview Badge Box -->
+            <div class="link-preview-box" id="linkPreviewBox">
+              <div class="link-info">
+                <span class="link-type-badge" id="linkTypeBadge">
+                  <svg style="width:12px;height:12px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                  <span id="linkTypeBadgeText">Playlist</span>
+                </span>
+                <span class="link-title-snippet" id="linkTitleSnippet">Fetching playlist info...</span>
+              </div>
+              <button class="link-clear-btn" id="linkClearBtn">Clear</button>
+            </div>
+          </div>
+
+          <!-- 3-Column Settings Row -->
+          <div class="settings-row">
+
+            <!-- Card 1: Select Location -->
+            <div class="setting-card">
+              <div class="setting-header">
+                <div class="setting-icon-pill">
+                  <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                </div>
+                <div class="setting-label">Select Location</div>
+              </div>
+              <div class="location-input-group">
+                <input type="text" id="downloadLocationInput" class="location-input" readonly value="Loading default path...">
+                <button class="btn-browse" id="btnBrowseLocation">
+                  <svg style="width:14px;height:14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                  Browse
+                </button>
+              </div>
+              <div class="setting-helper">Auto-detected Windows PC Downloads folder</div>
+            </div>
+
+            <!-- Card 2: Format -->
+            <div class="setting-card">
+              <div class="setting-header">
+                <div class="setting-icon-pill">
+                  <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+                </div>
+                <div class="setting-label">Format</div>
+              </div>
+              <div class="custom-select-wrapper">
+                <select id="formatSelect" class="custom-select">
+                  <option value="MP4">MP4 (Video)</option>
+                  <option value="MKV">MKV (Video)</option>
+                  <option value="MP3 (Audio Only)">MP3 (Audio Only)</option>
+                  <option value="M4A">M4A (Audio)</option>
+                </select>
+                <svg class="select-chevron" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </div>
+              <div class="setting-helper" id="formatHelper">Universal MP4 video playback</div>
+            </div>
+
+            <!-- Card 3: Quality -->
+            <div class="setting-card">
+              <div class="setting-header">
+                <div class="setting-icon-pill">
+                  <svg viewBox="0 0 24 24"><path d="M6 3h12l4 6-10 12L2 9z"></path></svg>
+                </div>
+                <div class="setting-label">Quality</div>
+              </div>
+              <div class="custom-select-wrapper">
+                <select id="qualitySelect" class="custom-select">
+                  <option value="1080p (Full HD)">1080p (Full HD)</option>
+                  <option value="720p (HD)">720p (HD)</option>
+                  <option value="480p">480p (Standard)</option>
+                  <option value="360p">360p (Lightweight)</option>
+                  <option value="2160p (4K)">2160p (4K Ultra HD)</option>
+                  <option value="Best Audio (320kbps)">Best Audio (320kbps)</option>
+                </select>
+                <svg class="select-chevron" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </div>
+              <div class="setting-helper" id="qualityHelper">Crisp 1080p high definition</div>
+            </div>
+
+          </div>
+
+          <!-- Primary CTA Button with Fading Horizontal Neon Laser Lines -->
+          <div class="cta-container">
+            <div class="laser-line left"></div>
+            <button class="btn-download-primary" id="btnStartDownload">
+              <svg viewBox="0 0 24 24">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              <span>Download Playlist</span>
+            </button>
+            <div class="laser-line right"></div>
+          </div>
+
+          <!-- Live Download Status Drawer (Collapsible Progress Card) -->
+          <div class="download-drawer" id="liveDownloadDrawer">
+            <div class="drawer-header">
+              <div class="drawer-title-group">
+                <div class="status-pulse-dot" id="drawerPulseDot"></div>
+                <div class="active-download-title" id="drawerMediaTitle">Initializing download engine...</div>
+              </div>
+              <div class="playlist-item-counter" id="drawerItemCounter">Video 1 of 1</div>
+            </div>
+
+            <!-- Glowing Green Progress Bar -->
+            <div class="progress-track-container">
+              <div class="progress-track">
+                <div class="progress-bar-fill" id="drawerProgressBar"></div>
+              </div>
+            </div>
+
+            <!-- Real-Time Metrics Row -->
+            <div class="progress-metrics-row">
+              <div class="metric-badge">
+                <span>Speed:</span>
+                <strong id="drawerSpeed">0.0 MB/s</strong>
+              </div>
+              <div class="metric-badge">
+                <span>ETA:</span>
+                <strong id="drawerEta">--:--</strong>
+              </div>
+              <div class="metric-badge">
+                <span>Size:</span>
+                <strong id="drawerSize">0 MB</strong>
+              </div>
+              <div class="metric-percent" id="drawerPercent">0%</div>
+            </div>
+
+            <!-- Drawer Footer Actions -->
+            <div class="drawer-footer-actions">
+              <button class="btn-danger-outline" id="btnCancelDownload">
+                <svg style="width:13px;height:13px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                Cancel
+              </button>
+              <button class="btn-secondary" id="btnOpenDrawerFolder">
+                <svg style="width:14px;height:14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                Open Folder
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ==============================================================
+             TAB 2: MY DOWNLOADS
+             ============================================================== -->
+        <div class="tab-content" id="tab-downloads">
+          <div class="tab-header-box">
+            <h2 class="tab-title">
+              <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              Active &amp; Queued Downloads
+            </h2>
+            <button class="btn-secondary" id="btnOpenDownloadsFolderGlobal">
+              <svg style="width:14px;height:14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+              Open Downloads Folder
+            </button>
+          </div>
+
+          <div id="activeDownloadsContainer">
+            <!-- Dynamic Active Tasks rendered here -->
+            <div class="empty-state" id="noActiveTasksMsg">
+              <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              <div style="font-size: 15px; font-weight: 600; margin-bottom: 4px; color: #fff;">No Downloads in Progress</div>
+              <p>Paste a YouTube playlist or video link in the Home tab and hit Download.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- ==============================================================
+             TAB 3: HISTORY
+             ============================================================== -->
+        <div class="tab-content" id="tab-history">
+          <div class="tab-header-box">
+            <h2 class="tab-title">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              Download History
+            </h2>
+            <button class="btn-danger-outline" id="btnClearHistoryBtn">
+              <svg style="width:13px;height:13px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+              Clear History
+            </button>
+          </div>
+
+          <div class="history-container" id="historyListContainer">
+            <!-- Dynamically populated from localStorage -->
+          </div>
+        </div>
+
+        <!-- ==============================================================
+             TAB 4: SETTINGS
+             ============================================================== -->
+        <div class="tab-content" id="tab-settings">
+          <div class="tab-header-box">
+            <h2 class="tab-title">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+              Application Settings
+            </h2>
+          </div>
+
+          <div class="settings-grid">
+            <!-- Path & Folder Settings -->
+            <div class="settings-panel">
+              <div class="panel-section-title">
+                <svg style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                Download Directories
+              </div>
+              <div style="font-size: 13px; color: var(--text-muted);">
+                Configured default download directory on your local machine:
+              </div>
+              <div class="location-input-group">
+                <input type="text" id="settingsLocationInput" class="location-input" readonly value="">
+                <button class="btn-browse" id="btnSettingsBrowse">
+                  <svg style="width:14px;height:14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                  Change Folder
+                </button>
+              </div>
+              <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer;color:#e3f5ed;">
+                <input type="checkbox" id="autoOpenFolderCheck" checked style="accent-color:var(--neon-primary);width:16px;height:16px;">
+                <span>Automatically open folder in Windows Explorer upon completion</span>
+              </label>
+              <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer;color:#e3f5ed;">
+                <input type="checkbox" id="createPlaylistFolderCheck" checked style="accent-color:var(--neon-primary);width:16px;height:16px;">
+                <span>Create a dedicated subfolder for playlists</span>
+              </label>
+            </div>
+
+            <!-- System Diagnostics & Binaries -->
+            <div class="settings-panel">
+              <div class="panel-section-title">
+                <svg style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+                Local Engine Status
+              </div>
+
+              <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px;">
+                <div style="background: rgba(4,16,10,0.7); border:1px solid rgba(0,255,136,0.2); border-radius:var(--radius-sm); padding:12px;">
+                  <div style="font-size:11.5px;color:var(--text-dim);margin-bottom:4px;">YT-DLP CORE ENGINE</div>
+                  <div style="display:flex;align-items:center;justify-content:space-between;">
+                    <strong id="ytDlpStatusText" style="font-size:13px;color:#fff;">Checking...</strong>
+                    <span class="sys-status-badge ok" id="ytDlpBadge">Verified</span>
+                  </div>
+                </div>
+
+                <div style="background: rgba(4,16,10,0.7); border:1px solid rgba(0,255,136,0.2); border-radius:var(--radius-sm); padding:12px;">
+                  <div style="font-size:11.5px;color:var(--text-dim);margin-bottom:4px;">FFMPEG MERGE ENGINE</div>
+                  <div style="display:flex;align-items:center;justify-content:space-between;">
+                    <strong id="ffmpegStatusText" style="font-size:13px;color:#fff;">Checking...</strong>
+                    <span class="sys-status-badge ok" id="ffmpegBadge">Ready</span>
+                  </div>
+                </div>
+              </div>
+
+              <div style="font-size: 11.5px; color: var(--text-dim); line-height: 1.5;">
+                ApexTube connects natively to your Windows operating system using PowerShell single-threaded dialogs, Server-Sent Events, and the yt-dlp binary.
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       VANILLA JAVASCRIPT: APPLICATION LOGIC & REAL-TIME SSE
+       ========================================================================== -->
+  <script>
+    (function() {
+      'use strict';
+
+      // ========================================================================
+      // State Management
+      // ========================================================================
+      const state = {
+        defaultDownloadPath: '',
+        currentJobId: null,
+        activeDownload: null,
+        isDownloading: false,
+        sseSource: null,
+        history: []
+      };
+
+      // ========================================================================
+      // DOM Elements
+      // ========================================================================
+      const el = {
+        // Window Controls
+        appWindow: document.getElementById('appWindow'),
+        winMinimizeBtn: document.getElementById('winMinimizeBtn'),
+        winMaximizeBtn: document.getElementById('winMaximizeBtn'),
+        winCloseBtn: document.getElementById('winCloseBtn'),
+
+        // Navigation
+        navItems: document.querySelectorAll('.nav-item'),
+        tabContents: document.querySelectorAll('.tab-content'),
+        activeTasksBadge: document.getElementById('activeTasksBadge'),
+
+        // Home Tab
+        playlistUrlInput: document.getElementById('playlistUrlInput'),
+        pasteClipboardBtn: document.getElementById('pasteClipboardBtn'),
+        linkPreviewBox: document.getElementById('linkPreviewBox'),
+        linkTypeBadgeText: document.getElementById('linkTypeBadgeText'),
+        linkTitleSnippet: document.getElementById('linkTitleSnippet'),
+        linkClearBtn: document.getElementById('linkClearBtn'),
+
+        // 3-Column Settings
+        downloadLocationInput: document.getElementById('downloadLocationInput'),
+        btnBrowseLocation: document.getElementById('btnBrowseLocation'),
+        formatSelect: document.getElementById('formatSelect'),
+        qualitySelect: document.getElementById('qualitySelect'),
+        formatHelper: document.getElementById('formatHelper'),
+        qualityHelper: document.getElementById('qualityHelper'),
+
+        // Primary CTA
+        btnStartDownload: document.getElementById('btnStartDownload'),
+
+        // Live Drawer
+        liveDownloadDrawer: document.getElementById('liveDownloadDrawer'),
+        drawerPulseDot: document.getElementById('drawerPulseDot'),
+        drawerMediaTitle: document.getElementById('drawerMediaTitle'),
+        drawerItemCounter: document.getElementById('drawerItemCounter'),
+        drawerProgressBar: document.getElementById('drawerProgressBar'),
+        drawerSpeed: document.getElementById('drawerSpeed'),
+        drawerEta: document.getElementById('drawerEta'),
+        drawerSize: document.getElementById('drawerSize'),
+        drawerPercent: document.getElementById('drawerPercent'),
+        btnCancelDownload: document.getElementById('btnCancelDownload'),
+        btnOpenDrawerFolder: document.getElementById('btnOpenDrawerFolder'),
+
+        // My Downloads Tab
+        activeDownloadsContainer: document.getElementById('activeDownloadsContainer'),
+        noActiveTasksMsg: document.getElementById('noActiveTasksMsg'),
+        btnOpenDownloadsFolderGlobal: document.getElementById('btnOpenDownloadsFolderGlobal'),
+
+        // History Tab
+        historyListContainer: document.getElementById('historyListContainer'),
+        btnClearHistoryBtn: document.getElementById('btnClearHistoryBtn'),
+
+        // Settings Tab
+        settingsLocationInput: document.getElementById('settingsLocationInput'),
+        btnSettingsBrowse: document.getElementById('btnSettingsBrowse'),
+        autoOpenFolderCheck: document.getElementById('autoOpenFolderCheck'),
+        createPlaylistFolderCheck: document.getElementById('createPlaylistFolderCheck'),
+        ytDlpStatusText: document.getElementById('ytDlpStatusText'),
+        ytDlpBadge: document.getElementById('ytDlpBadge'),
+        ffmpegStatusText: document.getElementById('ffmpegStatusText'),
+        ffmpegBadge: document.getElementById('ffmpegBadge'),
+
+        // Toast Container
+        toastContainer: document.getElementById('toastContainer')
+      };
+
+      // ========================================================================
+      // Toast Notification Utility
+      // ========================================================================
+      function showToast(message, type = 'info', duration = 3500) {
+        const toast = document.createElement('div');
+        toast.className = `toast ${type === 'error' ? 'toast-error' : ''}`;
+
+        const iconSvg = type === 'error'
+          ? '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>'
+          : '<svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>';
+
+        toast.innerHTML = `${iconSvg}<span>${message}</span>`;
+        el.toastContainer.appendChild(toast);
+
+        setTimeout(() => {
+          toast.style.opacity = '0';
+          toast.style.transform = 'translateX(50px)';
+          setTimeout(() => toast.remove(), 300);
+        }, duration);
+      }
+
+      // ========================================================================
+      // Local Storage History Management
+      // ========================================================================
+      function loadHistory() {
+        try {
+          const raw = localStorage.getItem('apextube_history');
+          state.history = raw ? JSON.parse(raw) : [];
+        } catch (e) {
+          state.history = [];
+        }
+        renderHistory();
+      }
+
+      function saveHistoryItem(item) {
+        state.history.unshift({
+          id: 'item_' + Date.now(),
+          title: item.title || 'YouTube Media',
+          url: item.url || '',
+          format: item.format || 'MP4',
+          quality: item.quality || '1080p',
+          filePath: item.filePath || '',
+          folderPath: item.folderPath || state.defaultDownloadPath,
+          timestamp: new Date().toLocaleString()
+        });
+
+        // Limit to 50 items
+        if (state.history.length > 50) state.history.pop();
+
+        localStorage.setItem('apextube_history', JSON.stringify(state.history));
+        renderHistory();
+      }
+
+      function renderHistory() {
+        if (!el.historyListContainer) return;
+
+        if (state.history.length === 0) {
+          el.historyListContainer.innerHTML = `
+            <div class="empty-state">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              <div style="font-size: 15px; font-weight: 600; margin-bottom: 4px; color: #fff;">No Download History</div>
+              <p>Your completed downloads will appear here for easy folder access.</p>
+            </div>
+          `;
+          return;
+        }
+
+        el.historyListContainer.innerHTML = state.history.map(item => `
+          <div class="history-card">
+            <div class="history-left">
+              <div class="history-icon-badge">
+                <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+              </div>
+              <div>
+                <div class="history-title" title="${item.title}">${item.title}</div>
+                <div class="history-meta">
+                  <span style="color:var(--neon-primary);font-weight:700;">${item.format}</span>
+                  <span>&bull;</span>
+                  <span>${item.quality}</span>
+                  <span>&bull;</span>
+                  <span>${item.timestamp}</span>
+                </div>
+              </div>
+            </div>
+            <div class="history-actions">
+              <button class="btn-secondary" onclick="window.ApexTube.openFolder('${item.folderPath.replace(/\\/g, '\\\\')}', '${(item.filePath || '').replace(/\\/g, '\\\\')}')">
+                <svg style="width:13px;height:13px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                Open File
+              </button>
+            </div>
+          </div>
+        `).join('');
+      }
+
+      // ========================================================================
+      // Navigation Tabs
+      // ========================================================================
+      function initNavigation() {
+        el.navItems.forEach(item => {
+          item.addEventListener('click', (e) => {
+            e.preventDefault();
+            const targetTab = item.getAttribute('data-tab');
+
+            el.navItems.forEach(n => n.classList.remove('active'));
+            el.tabContents.forEach(t => t.classList.remove('active'));
+
+            item.classList.add('active');
+            const targetEl = document.getElementById(targetTab);
+            if (targetEl) targetEl.classList.add('active');
+
+            if (targetTab === 'tab-history') {
+              renderHistory();
+            } else if (targetTab === 'tab-downloads') {
+              updateMyDownloadsView();
+            }
+          });
+        });
+      }
+
+      // ========================================================================
+      // Window Controls (Desktop Emulation)
+      // ========================================================================
+      function initWindowControls() {
+        el.winMinimizeBtn.addEventListener('click', () => {
+          showToast('App window minimized to background tray');
+        });
+
+        el.winMaximizeBtn.addEventListener('click', () => {
+          if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(() => {});
+            el.winMaximizeBtn.textContent = '❐';
+          } else {
+            document.exitFullscreen().catch(() => {});
+            el.winMaximizeBtn.textContent = '□';
+          }
+        });
+
+        el.winCloseBtn.addEventListener('click', () => {
+          if (state.isDownloading) {
+            if (confirm('A download is currently running. Do you really want to close ApexTube?')) {
+              window.close();
+            }
+          } else {
+            showToast('ApexTube running locally at http://localhost:3000');
+          }
+        });
+      }
+
+      // ========================================================================
+      // System Initialization: Default Path & yt-dlp Status
+      // ========================================================================
+      async function fetchSystemDefaults() {
+        try {
+          const res = await fetch('/api/default-path');
+          const data = await res.json();
+          if (data.defaultPath) {
+            state.defaultDownloadPath = data.defaultPath;
+            el.downloadLocationInput.value = data.defaultPath;
+            el.settingsLocationInput.value = data.defaultPath;
+          }
+        } catch (err) {
+          console.error('Failed to load default path:', err);
+          el.downloadLocationInput.value = 'C:\\Downloads';
+        }
+
+        try {
+          const sysRes = await fetch('/api/system-status');
+          const sysData = await sysRes.json();
+
+          if (sysData.ytDlp) {
+            el.ytDlpStatusText.textContent = `yt-dlp v${sysData.ytDlp.version || 'Active'}`;
+            el.ytDlpBadge.textContent = 'Operational';
+            el.ytDlpBadge.className = 'sys-status-badge ok';
+          }
+
+          if (sysData.ffmpeg) {
+            el.ffmpegStatusText.textContent = sysData.ffmpeg.installed ? 'FFmpeg Installed' : 'FFmpeg Optional';
+            el.ffmpegBadge.textContent = sysData.ffmpeg.installed ? 'Ready' : 'Progressive Streams';
+            el.ffmpegBadge.className = sysData.ffmpeg.installed ? 'sys-status-badge ok' : 'sys-status-badge warn';
+          }
+        } catch (sysErr) {
+          console.warn('System status check skipped:', sysErr);
+        }
+      }
+
+      // ========================================================================
+      // Native Windows Folder Picker (Browse)
+      // ========================================================================
+      async function handleBrowseFolder() {
+        showToast('Opening native Windows folder selection...', 'info', 2500);
+        try {
+          const res = await fetch('/api/browse', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ initialPath: state.defaultDownloadPath })
+          });
+          const data = await res.json();
+
+          if (data.selectedPath) {
+            state.defaultDownloadPath = data.selectedPath;
+            el.downloadLocationInput.value = data.selectedPath;
+            el.settingsLocationInput.value = data.selectedPath;
+            showToast(`Location set: ${data.selectedPath}`);
+          }
+        } catch (err) {
+          showToast('Could not open folder picker: ' + err.message, 'error');
+        }
+      }
+
+      // Open Target Folder / File in Windows Explorer
+      async function openFolderInExplorer(folderPath, filePath) {
+        try {
+          const res = await fetch('/api/open-folder', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              folderPath: folderPath || state.defaultDownloadPath,
+              filePath: filePath || null
+            })
+          });
+          const data = await res.json();
+          if (data.success) {
+            showToast('Opened in Windows Explorer');
+          } else {
+            showToast(data.error || 'Failed to open directory', 'error');
+          }
+        } catch (err) {
+          showToast('Failed to open Explorer: ' + err.message, 'error');
+        }
+      }
+
+      // Expose helper globally for history card buttons
+      window.ApexTube = {
+        openFolder: openFolderInExplorer
+      };
+
+      // ========================================================================
+      // Clipboard Paste & URL Inspection
+      // ========================================================================
+      async function handlePasteFromClipboard() {
+        try {
+          if (!navigator.clipboard || !navigator.clipboard.readText) {
+            showToast('Clipboard access denied by browser permissions', 'error');
+            return;
+          }
+
+          const text = await navigator.clipboard.readText();
+          if (text && text.trim()) {
+            el.playlistUrlInput.value = text.trim();
+            showToast('Playlist link pasted from clipboard!');
+            inspectUrl(text.trim());
+          } else {
+            showToast('Clipboard is empty or contains no URL', 'error');
+          }
+        } catch (err) {
+          showToast('Failed to read clipboard: ' + err.message, 'error');
+        }
+      }
+
+      function inspectUrl(url) {
+        if (!url || !url.includes('youtube.com') && !url.includes('youtu.be')) {
+          el.linkPreviewBox.classList.remove('visible');
+          return;
+        }
+
+        const isPlaylist = url.includes('list=');
+        el.linkTypeBadgeText.textContent = isPlaylist ? 'Playlist' : 'Single Video';
+        el.btnStartDownload.querySelector('span').textContent = isPlaylist ? 'Download Playlist' : 'Download Video';
+
+        el.linkTitleSnippet.textContent = isPlaylist ? 'YouTube Playlist detected (Ready)' : 'YouTube Video detected (Ready)';
+        el.linkPreviewBox.classList.add('visible');
+
+        // Optional non-blocking metadata preview query
+        fetch('/api/info', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url })
+        })
+        .then(r => r.json())
+        .then(info => {
+          if (info && info.title) {
+            const countStr = info.count ? ` (${info.count} items)` : '';
+            el.linkTitleSnippet.textContent = `${info.title}${countStr}`;
+          }
+        })
+        .catch(() => {});
+      }
+
+      // ========================================================================
+      // Format & Quality Interactivity (Auto-Disabling / Switching)
+      // ========================================================================
+      function handleFormatChange() {
+        const fmt = el.formatSelect.value;
+        const isAudio = fmt.startsWith('MP3') || fmt === 'M4A';
+
+        if (isAudio) {
+          el.formatHelper.textContent = fmt.startsWith('MP3') ? 'High-fidelity MP3 audio (320kbps)' : 'Apple AAC/M4A high clarity';
+          el.qualitySelect.innerHTML = `
+            <option value="Best Audio (320kbps)">Best Audio (320kbps)</option>
+            <option value="Audio (192kbps)">High Quality (192kbps)</option>
+            <option value="Audio (128kbps)">Standard Audio (128kbps)</option>
+          `;
+          el.qualityHelper.textContent = 'Lossless/High-bitrate audio stream';
+        } else {
+          el.formatHelper.textContent = fmt === 'MP4' ? 'Universal MP4 video playback' : 'Matroska MKV container (subtitles & multi-audio)';
+          el.qualitySelect.innerHTML = `
+            <option value="1080p (Full HD)">1080p (Full HD)</option>
+            <option value="720p (HD)">720p (HD)</option>
+            <option value="480p">480p (Standard)</option>
+            <option value="360p">360p (Lightweight)</option>
+            <option value="2160p (4K)">2160p (4K Ultra HD)</option>
+            <option value="Best Audio (320kbps)">Best Audio (320kbps)</option>
+          `;
+          el.qualityHelper.textContent = 'Crisp 1080p high definition';
+        }
+      }
+
+      // ========================================================================
+      // Server-Sent Events (SSE) Progress Listener
+      // ========================================================================
+      function initSSE() {
+        if (state.sseSource) {
+          state.sseSource.close();
+        }
+
+        const source = new EventSource('/api/progress');
+        state.sseSource = source;
+
+        source.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            handleSSEMessage(data);
+          } catch (e) {
+            // Heartbeat or comment
+          }
+        };
+
+        source.onerror = () => {
+          // Automatic reconnect is standard for EventSource
+        };
+      }
+
+      function handleSSEMessage(data) {
+        if (!data || !data.type) return;
+
+        switch (data.type) {
+          case 'start':
+            state.isDownloading = true;
+            state.currentJobId = data.jobId;
+            el.btnStartDownload.disabled = true;
+            el.liveDownloadDrawer.classList.add('visible');
+            el.drawerMediaTitle.textContent = 'Starting download engine...';
+            el.drawerItemCounter.textContent = 'Connecting...';
+            el.drawerProgressBar.style.width = '2%';
+            el.drawerPercent.textContent = '0%';
+            updateActiveTasksBadge(1);
+            updateMyDownloadsView();
+            break;
+
+          case 'playlist_item':
+            el.drawerItemCounter.textContent = `Video ${data.currentItem} of ${data.totalItems}`;
+            updateMyDownloadsView();
+            break;
+
+          case 'item_start':
+            if (data.title) {
+              el.drawerMediaTitle.textContent = data.title;
+            }
+            if (data.currentItem && data.totalItems) {
+              el.drawerItemCounter.textContent = `Video ${data.currentItem} of ${data.totalItems}`;
+            }
+            break;
+
+          case 'progress':
+            const pct = Math.min(100, Math.max(0, data.percent || 0));
+            el.drawerProgressBar.style.width = `${pct}%`;
+            el.drawerPercent.textContent = `${pct.toFixed(1)}%`;
+            if (data.speed) el.drawerSpeed.textContent = data.speed;
+            if (data.eta) el.drawerEta.textContent = data.eta;
+            if (data.size) el.drawerSize.textContent = data.size;
+            if (data.title && el.drawerMediaTitle.textContent === 'Starting download engine...') {
+              el.drawerMediaTitle.textContent = data.title;
+            }
+            updateMyDownloadsView();
+            break;
+
+          case 'complete':
+            state.isDownloading = false;
+            el.btnStartDownload.disabled = false;
+            el.drawerProgressBar.style.width = '100%';
+            el.drawerPercent.textContent = '100%';
+            el.drawerSpeed.textContent = 'Completed';
+            el.drawerEta.textContent = '00:00';
+            el.drawerPulseDot.style.background = '#2ed573';
+            showToast('Download completed successfully!', 'info');
+            updateActiveTasksBadge(0);
+
+            // Save to localStorage history
+            saveHistoryItem({
+              title: data.title || el.drawerMediaTitle.textContent,
+              url: el.playlistUrlInput.value,
+              format: el.formatSelect.value,
+              quality: el.qualitySelect.value,
+              filePath: data.filePath,
+              folderPath: data.folderPath || state.defaultDownloadPath
+            });
+
+            // Auto-open in Windows Explorer if enabled in settings
+            if (el.autoOpenFolderCheck.checked) {
+              openFolderInExplorer(data.folderPath || state.defaultDownloadPath, data.filePath);
+            }
+
+            updateMyDownloadsView();
+            break;
+
+          case 'canceled':
+            state.isDownloading = false;
+            el.btnStartDownload.disabled = false;
+            el.drawerMediaTitle.textContent = 'Download Canceled';
+            el.drawerPulseDot.style.background = '#ff4757';
+            showToast('Download canceled', 'error');
+            updateActiveTasksBadge(0);
+            updateMyDownloadsView();
+            break;
+
+          case 'error':
+            state.isDownloading = false;
+            el.btnStartDownload.disabled = false;
+            el.drawerPulseDot.style.background = '#ff4757';
+            showToast(data.message || 'Download error occurred', 'error', 5000);
+            updateActiveTasksBadge(0);
+            updateMyDownloadsView();
+            break;
+        }
+      }
+
+      function updateActiveTasksBadge(count) {
+        if (count > 0) {
+          el.activeTasksBadge.style.display = 'inline-block';
+          el.activeTasksBadge.textContent = count;
+        } else {
+          el.activeTasksBadge.style.display = 'none';
+        }
+      }
+
+      function updateMyDownloadsView() {
+        if (!el.activeDownloadsContainer) return;
+
+        if (!state.isDownloading) {
+          el.noActiveTasksMsg.style.display = 'block';
+          const existing = el.activeDownloadsContainer.querySelector('.live-task-card');
+          if (existing) existing.remove();
+        } else {
+          el.noActiveTasksMsg.style.display = 'none';
+          let taskCard = el.activeDownloadsContainer.querySelector('.live-task-card');
+          if (!taskCard) {
+            taskCard = document.createElement('div');
+            taskCard.className = 'live-task-card history-card';
+            taskCard.style.borderColor = 'var(--neon-primary)';
+            el.activeDownloadsContainer.appendChild(taskCard);
+          }
+
+          taskCard.innerHTML = `
+            <div class="history-left" style="flex:1;">
+              <div class="status-pulse-dot"></div>
+              <div style="flex:1;overflow:hidden;">
+                <div class="history-title">${el.drawerMediaTitle.textContent}</div>
+                <div class="history-meta" style="margin-bottom:8px;">
+                  <span style="color:var(--neon-primary);font-weight:700;">${el.formatSelect.value}</span>
+                  <span>&bull;</span>
+                  <span>${el.drawerItemCounter.textContent}</span>
+                  <span>&bull;</span>
+                  <span>Speed: ${el.drawerSpeed.textContent}</span>
+                  <span>&bull;</span>
+                  <span>ETA: ${el.drawerEta.textContent}</span>
+                </div>
+                <div class="progress-track" style="height:6px;">
+                  <div class="progress-bar-fill" style="width: ${el.drawerProgressBar.style.width || '0%'};"></div>
+                </div>
+              </div>
+            </div>
+            <div class="history-actions">
+              <button class="btn-danger-outline" onclick="document.getElementById('btnCancelDownload').click()">Cancel</button>
+            </div>
+          `;
+        }
+      }
+
+      // ========================================================================
+      // Download Execution (Trigger Download)
+      // ========================================================================
+      async function handleStartDownload() {
+        const url = el.playlistUrlInput.value.trim();
+
+        if (!url) {
+          showToast('Please paste a YouTube playlist or video link first!', 'error');
+          el.playlistUrlInput.focus();
+          return;
+        }
+
+        if (state.isDownloading) {
+          showToast('A download is already in progress.', 'error');
+          return;
+        }
+
+        const payload = {
+          url: url,
+          downloadPath: el.downloadLocationInput.value.trim() || state.defaultDownloadPath,
+          format: el.formatSelect.value,
+          quality: el.qualitySelect.value,
+          createPlaylistFolder: el.createPlaylistFolderCheck.checked
+        };
+
+        el.btnStartDownload.disabled = true;
+        showToast('Initializing download task...', 'info');
+
+        try {
+          const res = await fetch('/api/download', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          const data = await res.json();
+
+          if (!res.ok || data.error) {
+            throw new Error(data.error || 'Server rejected download request');
+          }
+
+          state.currentJobId = data.jobId;
+        } catch (err) {
+          el.btnStartDownload.disabled = false;
+          showToast('Failed to start download: ' + err.message, 'error', 4500);
+        }
+      }
+
+      // Cancel Active Download
+      async function handleCancelDownload() {
+        if (!state.currentJobId) return;
+
+        try {
+          await fetch('/api/cancel', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ jobId: state.currentJobId })
+          });
+        } catch (err) {
+          showToast('Could not cancel download: ' + err.message, 'error');
+        }
+      }
+
+      // ========================================================================
+      // Event Binding & Initialization
+      // ========================================================================
+      function initEvents() {
+        // Window Controls
+        initWindowControls();
+
+        // Navigation
+        initNavigation();
+
+        // Browse Buttons (Home & Settings)
+        el.btnBrowseLocation.addEventListener('click', handleBrowseFolder);
+        el.btnSettingsBrowse.addEventListener('click', handleBrowseFolder);
+
+        // Paste & Clear
+        el.pasteClipboardBtn.addEventListener('click', handlePasteFromClipboard);
+        el.playlistUrlInput.addEventListener('input', (e) => inspectUrl(e.target.value.trim()));
+        el.linkClearBtn.addEventListener('click', () => {
+          el.playlistUrlInput.value = '';
+          el.linkPreviewBox.classList.remove('visible');
+          el.playlistUrlInput.focus();
+        });
+
+        // Format dropdown reactivity
+        el.formatSelect.addEventListener('change', handleFormatChange);
+
+        // CTA Download Button
+        el.btnStartDownload.addEventListener('click', handleStartDownload);
+
+        // Drawer Actions
+        el.btnCancelDownload.addEventListener('click', handleCancelDownload);
+        el.btnOpenDrawerFolder.addEventListener('click', () => openFolderInExplorer(el.downloadLocationInput.value));
+
+        // My Downloads & History Actions
+        el.btnOpenDownloadsFolderGlobal.addEventListener('click', () => openFolderInExplorer(state.defaultDownloadPath));
+        el.btnClearHistoryBtn.addEventListener('click', () => {
+          if (confirm('Are you sure you want to clear your entire download history?')) {
+            state.history = [];
+            localStorage.removeItem('apextube_history');
+            renderHistory();
+            showToast('History cleared');
+          }
+        });
+      }
+
+      // Entrypoint on DOM load
+      window.addEventListener('DOMContentLoaded', () => {
+        initEvents();
+        initSSE();
+        fetchSystemDefaults();
+        loadHistory();
+      });
+
+    })();
+  </script>
+</body>
+</html>
