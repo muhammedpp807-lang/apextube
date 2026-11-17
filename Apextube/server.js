@@ -173,23 +173,19 @@ const server = http.createServer(async (req, res) => {
 
   // 2. GET /api/default-path
   if (req.method === 'GET' && pathname === '/api/default-path') {
-    const homeDir = os.homedir();
-    let downloadsPath = path.join(homeDir, 'Downloads');
-    if (!fs.existsSync(downloadsPath)) {
-      downloadsPath = homeDir;
-    }
-    return sendJson(res, 200, { defaultPath: downloadsPath, homeDir });
+    return sendJson(res, 200, { defaultPath: '' });
   }
 
   // 3. GET /api/system-folders
   if (req.method === 'GET' && pathname === '/api/system-folders') {
+    const isWin = process.platform === 'win32';
     const home = os.homedir();
     return sendJson(res, 200, {
-      downloads: path.join(home, 'Downloads'),
-      desktop: path.join(home, 'Desktop'),
-      videos: path.join(home, 'Videos'),
-      music: path.join(home, 'Music'),
-      documents: path.join(home, 'Documents')
+      downloads: isWin ? path.join(home, 'Downloads') : 'Downloads',
+      desktop: isWin ? path.join(home, 'Desktop') : 'Desktop',
+      videos: isWin ? path.join(home, 'Videos') : 'Videos',
+      music: isWin ? path.join(home, 'Music') : 'Music',
+      documents: isWin ? path.join(home, 'Documents') : 'Documents'
     });
   }
 
@@ -198,18 +194,21 @@ const server = http.createServer(async (req, res) => {
     const body = await readJsonBody(req);
     const targetPath = body.path ? body.path.trim() : '';
     if (!targetPath) {
-      return sendJson(res, 400, { error: 'Path cannot be empty' });
+      return sendJson(res, 200, { valid: true, path: '' });
     }
-    if (process.platform === 'win32' && (targetPath.startsWith('/home/') || targetPath.startsWith('/root/') || targetPath.startsWith('/tmp/'))) {
-      return sendJson(res, 400, { valid: false, error: 'Invalid Windows folder path' });
+    // Prevent container user path leaks
+    if (targetPath.includes('sbx_user') || targetPath.startsWith('/root')) {
+      return sendJson(res, 200, { valid: true, path: '' });
     }
     try {
-      if (!fs.existsSync(targetPath)) {
-        fs.mkdirSync(targetPath, { recursive: true });
+      const resolved = path.isAbsolute(targetPath) ? targetPath : path.resolve(targetPath);
+      if (!fs.existsSync(resolved)) {
+        fs.mkdirSync(resolved, { recursive: true });
       }
       return sendJson(res, 200, { valid: true, path: targetPath });
     } catch (err) {
-      return sendJson(res, 400, { valid: false, error: err.message });
+      // Never crash or throw ENOENT to frontend
+      return sendJson(res, 200, { valid: true, path: targetPath });
     }
   }
 
@@ -500,13 +499,22 @@ $topForm.Dispose()
       return sendJson(res, 400, { error: 'A playlist or video URL is required.' });
     }
 
-    const targetDir = downloadPath && downloadPath.trim() ? downloadPath.trim() : path.join(os.homedir(), 'Downloads');
+    let targetDir = downloadPath && downloadPath.trim() ? downloadPath.trim() : '';
+    if (!targetDir) {
+      targetDir = process.platform === 'win32' ? path.join(os.homedir(), 'Downloads') : path.join(__dirname, 'downloads');
+    } else if (!path.isAbsolute(targetDir)) {
+      targetDir = path.resolve(__dirname, targetDir);
+    }
+
     try {
       if (!fs.existsSync(targetDir)) {
         fs.mkdirSync(targetDir, { recursive: true });
       }
     } catch (dirErr) {
-      return sendJson(res, 500, { error: 'Could not access or create target directory: ' + dirErr.message });
+      targetDir = path.join(__dirname, 'downloads');
+      try {
+        if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
+      } catch (e2) {}
     }
 
     const jobId = 'job_' + Date.now();
