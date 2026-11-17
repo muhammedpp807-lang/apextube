@@ -63,13 +63,21 @@ function readJsonBody(req) {
 
 // Resolve FFmpeg directory (root directory first)
 function resolveFfmpegDir() {
-  const rootFfmpeg = path.join(__dirname, 'ffmpeg.exe');
-  if (fs.existsSync(rootFfmpeg)) {
-    return __dirname;
-  }
-  const binFfmpeg = path.join(__dirname, 'bin', 'ffmpeg.exe');
-  if (fs.existsSync(binFfmpeg)) {
-    return path.join(__dirname, 'bin');
+  if (process.platform === 'win32') {
+    const rootFfmpeg = path.join(__dirname, 'ffmpeg.exe');
+    if (fs.existsSync(rootFfmpeg)) {
+      return __dirname;
+    }
+    const binFfmpeg = path.join(__dirname, 'bin', 'ffmpeg.exe');
+    if (fs.existsSync(binFfmpeg)) {
+      return path.join(__dirname, 'bin');
+    }
+  } else {
+    const linuxFfmpeg = path.join(__dirname, 'ffmpeg');
+    if (fs.existsSync(linuxFfmpeg)) {
+      try { fs.chmodSync(linuxFfmpeg, '755'); } catch (e) {}
+      return __dirname;
+    }
   }
   return null;
 }
@@ -88,27 +96,37 @@ function checkFfmpeg() {
 
 // Resolve yt-dlp executable (root directory first)
 function resolveYtDlp() {
-  const rootBin = path.join(__dirname, 'yt-dlp.exe');
-  if (fs.existsSync(rootBin)) {
-    return { cmd: rootBin, argsPrefix: [] };
-  }
+  if (process.platform === 'win32') {
+    const rootBin = path.join(__dirname, 'yt-dlp.exe');
+    if (fs.existsSync(rootBin)) {
+      return { cmd: rootBin, argsPrefix: [] };
+    }
 
-  const binFolder = path.join(__dirname, 'bin', 'yt-dlp.exe');
-  if (fs.existsSync(binFolder)) {
-    return { cmd: binFolder, argsPrefix: [] };
-  }
+    const binFolder = path.join(__dirname, 'bin', 'yt-dlp.exe');
+    if (fs.existsSync(binFolder)) {
+      return { cmd: binFolder, argsPrefix: [] };
+    }
 
-  if (process.platform === 'win32' && process.env.APPDATA) {
-    const pythonDirs = ['Python313', 'Python312', 'Python311', 'Python310', 'Python39'];
-    for (const dir of pythonDirs) {
-      const p = path.join(process.env.APPDATA, 'Python', dir, 'Scripts', 'yt-dlp.exe');
-      if (fs.existsSync(p)) {
-        return { cmd: p, argsPrefix: [] };
+    if (process.env.APPDATA) {
+      const pythonDirs = ['Python313', 'Python312', 'Python311', 'Python310', 'Python39'];
+      for (const dir of pythonDirs) {
+        const p = path.join(process.env.APPDATA, 'Python', dir, 'Scripts', 'yt-dlp.exe');
+        if (fs.existsSync(p)) {
+          return { cmd: p, argsPrefix: [] };
+        }
       }
     }
-  }
 
-  return { cmd: 'python', argsPrefix: ['-m', 'yt_dlp'] };
+    return { cmd: 'python', argsPrefix: ['-m', 'yt_dlp'] };
+  } else {
+    // Linux / Vercel / macOS
+    const linuxBin = path.join(__dirname, 'yt-dlp');
+    if (fs.existsSync(linuxBin)) {
+      try { fs.chmodSync(linuxBin, '755'); } catch (e) {}
+      return { cmd: linuxBin, argsPrefix: [] };
+    }
+    return { cmd: 'yt-dlp', argsPrefix: [] };
+  }
 }
 
 // Cleanup orphan audio or .part files after download
@@ -714,11 +732,15 @@ $topForm.Dispose()
           timestamp: Date.now()
         });
       } else {
+        let errorMsg = `Download ended with exit code ${code}. Please verify the URL and network connection.`;
+        if (code === 126) {
+          errorMsg = 'Exit code 126: Execution permission denied. Cloud/Vercel Linux servers cannot run Windows (.exe) binaries. Please launch ApexTube.exe on your Windows PC to download directly into your Downloads folder.';
+        }
         broadcast({
           type: 'error',
           jobId,
           code,
-          message: `Download ended with exit code ${code}. Please verify the URL and network connection.`
+          message: errorMsg
         });
       }
     });
