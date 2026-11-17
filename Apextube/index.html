@@ -2510,7 +2510,10 @@
       async function openFolderModal(initialPath) {
         if (!el.folderExplorerModal) return;
         el.folderExplorerModal.style.display = 'flex';
-        const start = initialPath || state.defaultDownloadPath || 'C:\\';
+        let start = (initialPath || state.defaultDownloadPath || '').trim();
+        if (start.includes('sbx_user') || start.startsWith('/home')) {
+          start = '';
+        }
         await navigateModalTo(start);
       }
 
@@ -2863,6 +2866,12 @@
           case 'playlist_item':
             el.drawerItemCounter.textContent = `Video ${data.currentItem} of ${data.totalItems}`;
             updateMyDownloadsView();
+            break;
+
+          case 'status_update':
+            if (data.status) {
+              el.drawerItemCounter.textContent = data.status;
+            }
             break;
 
           case 'item_start':

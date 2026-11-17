@@ -306,13 +306,11 @@ $topForm.Dispose()
   if (req.method === 'POST' && pathname === '/api/list-directory') {
     const body = await readJsonBody(req);
     let targetDir = body.dir ? body.dir.trim() : '';
-    if (!targetDir || !fs.existsSync(targetDir)) {
-      targetDir = path.join(os.homedir(), 'Downloads');
-      if (!fs.existsSync(targetDir)) targetDir = os.homedir();
-    }
 
+    const isWin = process.platform === 'win32';
     const drives = [];
-    if (process.platform === 'win32') {
+
+    if (isWin) {
       const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
       for (let i = 0; i < letters.length; i++) {
         const root = letters[i] + ':\\';
@@ -322,54 +320,76 @@ $topForm.Dispose()
           }
         } catch (e) {}
       }
-    }
 
-    const home = os.homedir();
-    const systemFolders = {
-      downloads: path.join(home, 'Downloads'),
-      desktop: path.join(home, 'Desktop'),
-      videos: path.join(home, 'Videos'),
-      music: path.join(home, 'Music'),
-      documents: path.join(home, 'Documents')
-    };
+      if (!targetDir || !fs.existsSync(targetDir) || targetDir.includes('sbx_user') || targetDir.startsWith('/home')) {
+        targetDir = path.join(os.homedir(), 'Downloads');
+        if (!fs.existsSync(targetDir)) targetDir = os.homedir();
+      }
 
-    let folders = [];
-    let isRoot = false;
-    let parent = null;
+      const home = os.homedir();
+      const systemFolders = {
+        downloads: path.join(home, 'Downloads'),
+        desktop: path.join(home, 'Desktop'),
+        videos: path.join(home, 'Videos'),
+        music: path.join(home, 'Music'),
+        documents: path.join(home, 'Documents')
+      };
 
-    try {
-      const parsed = path.parse(targetDir);
-      isRoot = (parsed.root.toLowerCase() === targetDir.toLowerCase()) || (path.dirname(targetDir) === targetDir);
-      parent = isRoot ? null : path.dirname(targetDir);
+      let folders = [];
+      let isRoot = false;
+      let parent = null;
 
-      const items = fs.readdirSync(targetDir, { withFileTypes: true });
-      for (const item of items) {
-        if (item.isDirectory()) {
-          if (!item.name.startsWith('$') && !item.name.startsWith('.')) {
-            folders.push(item.name);
+      try {
+        const parsed = path.parse(targetDir);
+        isRoot = (parsed.root.toLowerCase() === targetDir.toLowerCase()) || (path.dirname(targetDir) === targetDir);
+        parent = isRoot ? null : path.dirname(targetDir);
+
+        const items = fs.readdirSync(targetDir, { withFileTypes: true });
+        for (const item of items) {
+          if (item.isDirectory()) {
+            if (!item.name.startsWith('$') && !item.name.startsWith('.')) {
+              folders.push(item.name);
+            }
           }
         }
+        folders.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+      } catch (err) {
+        return sendJson(res, 200, {
+          current: targetDir,
+          parent: path.dirname(targetDir),
+          drives,
+          folders: [],
+          systemFolders,
+          error: err.message
+        });
       }
-      folders.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
-    } catch (err) {
+
       return sendJson(res, 200, {
         current: targetDir,
-        parent: path.dirname(targetDir),
+        parent,
+        isRoot,
         drives,
-        folders: [],
-        systemFolders,
-        error: err.message
+        folders,
+        systemFolders
+      });
+    } else {
+      // Clean virtual folder listing for web / cloud (Never leak sbx_user or Linux container paths)
+      const standardFolders = ['Downloads', 'Videos', 'Music', 'Desktop', 'Playlists'];
+      return sendJson(res, 200, {
+        current: 'Downloads',
+        parent: null,
+        isRoot: true,
+        drives: ['Downloads'],
+        folders: standardFolders,
+        systemFolders: {
+          downloads: 'Downloads',
+          desktop: 'Desktop',
+          videos: 'Videos',
+          music: 'Music',
+          documents: 'Downloads'
+        }
       });
     }
-
-    return sendJson(res, 200, {
-      current: targetDir,
-      parent,
-      isRoot,
-      drives,
-      folders,
-      systemFolders
-    });
   }
 
   // 5c. POST /api/create-folder
@@ -541,7 +561,19 @@ $topForm.Dispose()
 
     const args = [...argsPrefix];
     args.push('--newline');
-    args.push('--yes-playlist');
+
+    // Super-speed acceleration: 4 parallel fragment connections & larger buffer
+    args.push('--concurrent-fragments', '4');
+    args.push('--buffer-size', '16M');
+
+    // Fast-start: only query playlist API if URL is actually a playlist
+    const isPlaylist = targetUrl.includes('list=') || targetUrl.includes('/playlist');
+    if (isPlaylist) {
+      args.push('--yes-playlist');
+    } else {
+      args.push('--no-playlist');
+    }
+
     args.push('--no-mtime');
     args.push('--no-check-certificates');
     args.push('--no-keep-video');
@@ -653,6 +685,14 @@ $topForm.Dispose()
             currentItem,
             totalItems,
             status: `Downloading item ${currentItem} of ${totalItems}`
+          });
+        }
+
+        if (line.match(/\[(?:youtube|info)\]/i) && activeTitle === 'Downloading...') {
+          broadcast({
+            type: 'status_update',
+            jobId,
+            status: 'Connecting to YouTube...'
           });
         }
 
