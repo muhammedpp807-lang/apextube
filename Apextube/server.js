@@ -200,6 +200,9 @@ const server = http.createServer(async (req, res) => {
     if (!targetPath) {
       return sendJson(res, 400, { error: 'Path cannot be empty' });
     }
+    if (process.platform === 'win32' && (targetPath.startsWith('/home/') || targetPath.startsWith('/root/') || targetPath.startsWith('/tmp/'))) {
+      return sendJson(res, 400, { valid: false, error: 'Invalid Windows folder path' });
+    }
     try {
       if (!fs.existsSync(targetPath)) {
         fs.mkdirSync(targetPath, { recursive: true });

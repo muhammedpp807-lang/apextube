@@ -1882,7 +1882,7 @@
                 <div class="setting-label">Select Location</div>
               </div>
               <div class="location-input-group">
-                <input type="text" id="downloadLocationInput" class="location-input" placeholder="Type or paste folder path..." value="" spellcheck="false" autocomplete="off" title="Directly editable: click to type, edit, or paste your download folder path">
+                <input type="text" id="downloadLocationInput" class="location-input" placeholder="Choose or paste download location..." value="" spellcheck="false" autocomplete="off" title="Directly editable: click to type, edit, or paste your download folder path">
                 <button class="btn-browse" id="btnBrowseLocation" title="Browse folders with in-app explorer or Windows dialog">
                   <svg style="width:14px;height:14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
                   Browse
@@ -1890,12 +1890,12 @@
               </div>
               <!-- Quick Preset Folder Shortcuts -->
               <div class="quick-paths-row">
-                <button type="button" class="path-pill-btn active" data-folder="downloads" title="Switch to Downloads folder">📂 Downloads</button>
+                <button type="button" class="path-pill-btn" data-folder="downloads" title="Switch to Downloads folder">📂 Downloads</button>
                 <button type="button" class="path-pill-btn" data-folder="desktop" title="Switch to Desktop folder">🖥️ Desktop</button>
                 <button type="button" class="path-pill-btn" data-folder="videos" title="Switch to Videos folder">🎬 Videos</button>
                 <button type="button" class="path-pill-btn" data-folder="music" title="Switch to Music folder">🎵 Music</button>
               </div>
-              <div class="setting-helper" id="locationHelper">Type/paste any path or click a quick folder above</div>
+              <div class="setting-helper" id="locationHelper">Choose a folder below or click Browse to set location</div>
             </div>
 
             <!-- Card 2: Format -->
@@ -2442,8 +2442,35 @@
       // Download Location Management & Presets
       // ========================================================================
       async function setDownloadPath(targetPath, notify = false) {
-        if (!targetPath) return;
+        if (!targetPath || !targetPath.trim()) {
+          state.defaultDownloadPath = '';
+          if (el.downloadLocationInput) el.downloadLocationInput.value = '';
+          if (el.settingsLocationInput) el.settingsLocationInput.value = '';
+          localStorage.removeItem('apextube_download_path');
+          updatePresetPills('');
+          if (el.locationHelper) {
+            el.locationHelper.textContent = 'Choose a folder below or click Browse to set location';
+            el.locationHelper.style.color = 'var(--text-muted)';
+          }
+          return;
+        }
+
         const cleanPath = targetPath.trim();
+
+        // Discard invalid / foreign path artifacts from sandboxes
+        if (cleanPath.startsWith('/home/') || cleanPath.startsWith('/root/') || cleanPath.startsWith('/tmp/')) {
+          localStorage.removeItem('apextube_download_path');
+          state.defaultDownloadPath = '';
+          if (el.downloadLocationInput) el.downloadLocationInput.value = '';
+          if (el.settingsLocationInput) el.settingsLocationInput.value = '';
+          updatePresetPills('');
+          if (el.locationHelper) {
+            el.locationHelper.textContent = 'Choose a folder below or click Browse to set location';
+            el.locationHelper.style.color = 'var(--text-muted)';
+          }
+          return;
+        }
+
         state.defaultDownloadPath = cleanPath;
         if (el.downloadLocationInput) el.downloadLocationInput.value = cleanPath;
         if (el.settingsLocationInput) el.settingsLocationInput.value = cleanPath;
@@ -2648,7 +2675,7 @@
       // System Initialization: Default Path & yt-dlp Status
       // ========================================================================
       async function fetchSystemDefaults() {
-        // 1. Fetch system folders
+        // 1. Fetch system folders for preset buttons
         try {
           const sysRes = await fetch('/api/system-folders');
           const sysData = await sysRes.json();
@@ -2657,20 +2684,27 @@
           console.warn('System folders fetch fallback:', e);
         }
 
-        // 2. Check saved user path or default
-        const savedPath = localStorage.getItem('apextube_download_path');
-        if (savedPath) {
-          await setDownloadPath(savedPath, false);
+        // 2. Check if user previously chose and saved a location
+        let savedPath = localStorage.getItem('apextube_download_path');
+
+        // Clean up invalid cross-platform or sandbox artifacts
+        if (savedPath && (savedPath.startsWith('/home/') || savedPath.startsWith('/root/') || savedPath.startsWith('/tmp/') || !savedPath.trim())) {
+          localStorage.removeItem('apextube_download_path');
+          savedPath = null;
+        }
+
+        if (savedPath && savedPath.trim()) {
+          // If the user previously selected a folder, retain it
+          await setDownloadPath(savedPath.trim(), false);
         } else {
-          try {
-            const res = await fetch('/api/default-path');
-            const data = await res.json();
-            if (data.defaultPath) {
-              await setDownloadPath(data.defaultPath, false);
-            }
-          } catch (err) {
-            console.error('Failed to load default path:', err);
-            await setDownloadPath('C:\\Downloads', false);
+          // First time or no location selected: START WITH EMPTY INPUT!
+          state.defaultDownloadPath = '';
+          if (el.downloadLocationInput) el.downloadLocationInput.value = '';
+          if (el.settingsLocationInput) el.settingsLocationInput.value = '';
+          updatePresetPills('');
+          if (el.locationHelper) {
+            el.locationHelper.textContent = 'Choose a folder below or click Browse to set location';
+            el.locationHelper.style.color = 'var(--text-muted)';
           }
         }
 
@@ -2986,6 +3020,18 @@
           return;
         }
 
+        const targetFolder = (el.downloadLocationInput.value || state.defaultDownloadPath || '').trim();
+        if (!targetFolder) {
+          showToast('Please choose or enter a download location first!', 'error');
+          el.downloadLocationInput.focus();
+          el.downloadLocationInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          if (el.locationHelper) {
+            el.locationHelper.textContent = '⚠️ Location required: select a folder below or click Browse';
+            el.locationHelper.style.color = '#ff6b6b';
+          }
+          return;
+        }
+
         if (state.isDownloading) {
           showToast('A download is already in progress.', 'error');
           return;
@@ -2993,7 +3039,7 @@
 
         const payload = {
           url: url,
-          downloadPath: el.downloadLocationInput.value.trim() || state.defaultDownloadPath,
+          downloadPath: targetFolder,
           format: el.formatSelect.value,
           quality: el.qualitySelect.value,
           createPlaylistFolder: el.createPlaylistFolderCheck.checked
@@ -3070,12 +3116,22 @@
             el.downloadLocationInput.value = val;
           }
           state.defaultDownloadPath = val;
-          updatePresetPills(val);
+          if (!val) {
+            localStorage.removeItem('apextube_download_path');
+            updatePresetPills('');
+            if (el.locationHelper) {
+              el.locationHelper.textContent = 'Choose a folder below or click Browse to set location';
+              el.locationHelper.style.color = 'var(--text-muted)';
+            }
+          } else {
+            localStorage.setItem('apextube_download_path', val);
+            updatePresetPills(val);
+          }
         };
 
         const handleManualPathBlur = (e) => {
           const val = e.target.value.trim();
-          if (val) setDownloadPath(val, false);
+          setDownloadPath(val, false);
         };
 
         el.downloadLocationInput.addEventListener('input', handleManualPathInput);
